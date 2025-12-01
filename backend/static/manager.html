@@ -21,7 +21,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600 mr-3" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18H4v-3a6 6 0 0112 0v3z" />
                 </svg>
-                Team Management & Oversight
+                Team Management Dashboard
             </h1>
             <div class="flex items-center gap-3">
                 <button id="showNotificationsBtn" class="bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
@@ -55,6 +55,12 @@
                 <button id="batchScheduleBtn" class="bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg transition duration-150">Run Batch Scheduler</button>
                 <button id="showCreateTaskBtn" class="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg transition duration-150">+ Create New Task</button>
                 <button id="showDependencyBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition duration-150">Set Dependency</button>
+                <button
+                onclick="window.location.href='/static/org_chart.html'"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm shadow">
+                View Organization Chart
+                </button>
+
             </div>
             <div id="scheduleMessage" class="text-sm small-muted"></div>
         </section>

@@ -20,7 +20,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-purple-600 mr-3" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 110-6 3 3 0 010 6z" clip-rule="evenodd"/>
         </svg>
-        System Admin Console
+        HR Admin Dashboard
       </h1>
 
       <div class="flex items-center space-x-4 mt-4 md:mt-0">
@@ -53,6 +53,12 @@
         <button id="showCreateTaskBtn" class="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg transition duration-150">+ Create New Task</button>
         <button id="showDependencyBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition duration-150">Set Dependency</button>
         <button id="showNotificationsBtn" class="bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-lg transition duration-150">Notifications</button>
+        <button
+          onclick="window.location.href='/static/org_chart.html'"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm shadow">
+          View Organization Chart
+        </button>
+
       </div>
       <div id="scheduleMessage" class="text-sm small-muted"></div>
     </section>

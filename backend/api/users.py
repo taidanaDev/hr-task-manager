@@ -2,6 +2,9 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 from werkzeug.security import generate_password_hash
 import secrets, string
+from backend.api.tree_utils import build_forest_from_db_rows, get_subtree_ids, serialize_forest, serialize_node
+
+
 
 from backend.models import db, User, RoleEnum
 
@@ -195,3 +198,55 @@ def admin_reset_password():
     db.session.commit()
 
     return jsonify({"msg":"password reset", "temporary_password": new_pw}), 200
+
+@bp.route("/<int:manager_id>/subtree-ids", methods=["GET"])
+@jwt_required()
+def manager_subtree_ids(manager_id):
+    claims = get_jwt() or {}
+    role = claims.get("role")
+    caller_id = int(get_jwt_identity())
+
+    if role == RoleEnum.MANAGER.value and manager_id != caller_id:
+        return jsonify({"msg":"forbidden"}), 403
+    rows = db.session.query(User.id, User.supervisor_id, User.name, User.email, User.role).all()
+    nodes = build_forest_from_db_rows(rows)
+    subtree_ids = get_subtree_ids(nodes.get(int(manager_id))) if nodes.get(int(manager_id)) else []
+    return jsonify({"manager_id": manager_id, "subtree_ids": subtree_ids}), 200
+
+@bp.route("/org-chart", methods=["GET"])
+@jwt_required()
+def org_chart_json():
+    """
+    Query param: ?scope=full or ?scope=self
+    - scope=full  -> return full organization for everyone (admin/manager/employee)
+    - scope=self  -> admin: full, manager: subtree, employee: own record (or forbidden)
+    - default     -> behaves as scope=self
+    """
+    claims = get_jwt() or {}
+    role = claims.get("role")
+    caller_id = int(get_jwt_identity())
+    scope = (request.args.get("scope") or "self").lower()
+
+    rows = db.session.query(User.id, User.name, User.supervisor_id, User.role, User.position).all()
+    nodes = build_forest_from_db_rows(rows)
+
+
+    if scope == "full":
+        out = serialize_forest(nodes)
+        return jsonify(out), 200
+
+    if role == RoleEnum.ADMIN.value:
+        out = serialize_forest(nodes)
+        return jsonify(out), 200
+
+    if role == RoleEnum.MANAGER.value:
+        root = nodes.get(caller_id)
+        out = [serialize_node(root, include_children=True)] if root else []
+        return jsonify(out), 200
+
+    user_node = nodes.get(caller_id)
+    if user_node:
+        out = [serialize_node(user_node, include_children=True)]
+        return jsonify(out), 200
+
+    return jsonify({"msg": "forbidden"}), 403

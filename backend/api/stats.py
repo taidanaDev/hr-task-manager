@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 from backend.models import db, User, Task, StatusEnum, PriorityEnum, RoleEnum
 from backend.api._auth_helpers import role_required
 from sqlalchemy import func
+from backend.api.tree_utils import build_forest_from_db_rows, get_subtree_ids
 
 bp = Blueprint("stats", __name__, url_prefix="/api/stats")
 
@@ -19,7 +20,10 @@ def stats_overview():
     if role == RoleEnum.ADMIN.value:
         user_filter_ids = None
     elif role == RoleEnum.MANAGER.value:
-        user_filter_ids = db.session.query(User.id).filter_by(supervisor_id=caller_id).subquery()
+        all_users = db.session.query(User.id, User.supervisor_id).all()
+        nodes = build_forest_from_db_rows(all_users)
+        manager_subtree = get_subtree_ids(nodes.get(caller_id))
+        user_filter_ids = manager_subtree  
     else:
         return jsonify({"msg":"forbidden - only admin or manager"}), 403
 

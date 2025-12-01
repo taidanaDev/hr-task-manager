@@ -89,14 +89,36 @@
 const API_BASE_URL = window.location.origin;
 
 function getToken() { return localStorage.getItem('token'); }
+function getLocalUser() {
+    const raw = localStorage.getItem('user');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+}
 function logoutToLogin() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }
 
 async function loadManagersIntoSelect() {
     const token = getToken();
     const sel = document.getElementById('supervisor');
     if (!sel) return;
-    sel.innerHTML = '<option value=\"\">— No Supervisor —</option>';
-    if (!token) return; // silently leave option empty; admin without token will be redirected on submit
+    // reset
+    sel.innerHTML = '<option value="">— No Supervisor —</option>';
+
+    // Add currently-logged-in user (if present in localStorage) so admin can choose themselves
+    const localUser = getLocalUser();
+    const addedIds = new Set();
+    if (localUser && localUser.id != null) {
+        const optSelf = document.createElement('option');
+        optSelf.value = String(localUser.id);
+        // label explicitly shows "You" to avoid confusion
+        optSelf.textContent = `${localUser.id} — ${localUser.name} (${localUser.email}) — You`;
+        sel.appendChild(optSelf);
+        addedIds.add(String(localUser.id));
+    }
+
+    if (!token) {
+        // If no token, stop here (select will at least allow choosing local user if available)
+        return;
+    }
 
     try {
         const res = await fetch(`${API_BASE_URL}/api/users?role=manager`, {
@@ -104,16 +126,19 @@ async function loadManagersIntoSelect() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) {
-            // if unauthorized, do nothing here; create will handle token check
+            // If unauthorized or other error, do not throw — form submission will handle auth/redirect.
             return;
         }
         const data = await res.json();
         if (!Array.isArray(data)) return;
         data.forEach(m => {
+            const idStr = String(m.id);
+            if (addedIds.has(idStr)) return; // avoid duplicates (e.g., if local user is also a manager)
             const opt = document.createElement('option');
-            opt.value = m.id;
+            opt.value = idStr;
             opt.textContent = `${m.id} — ${m.name} (${m.email})`;
             sel.appendChild(opt);
+            addedIds.add(idStr);
         });
     } catch (e) {
         console.error('Failed to load managers', e);
@@ -142,7 +167,11 @@ async function handleCreateUser(event) {
     };
 
     const sup = document.getElementById('supervisor').value;
-    if (sup && sup !== '') payload.supervisor_id = parseInt(sup, 10);
+    if (sup && sup !== '') {
+        // ensure integer for API
+        const parsed = parseInt(sup, 10);
+        if (!Number.isNaN(parsed)) payload.supervisor_id = parsed;
+    }
 
     resultDiv.className = 'text-gray-500';
     resultDiv.textContent = 'Creating user...';
