@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>HR Task Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background:#f4f7f9; }
+    .stat-card { box-shadow: 0 4px 8px rgba(11,12,16,0.04); }
+    .small-muted { color: #6b7280; font-size: 0.9rem; }
+    .modal-active { display: flex !important; }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div class="max-w-7xl mx-auto">
+    <header class="flex flex-wrap justify-between items-center py-4 border-b border-gray-200 mb-6">
+      <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-purple-600 mr-3" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 110-6 3 3 0 010 6z" clip-rule="evenodd"/>
+        </svg>
+        System Admin Console
+      </h1>
+
+      <div class="flex items-center space-x-4 mt-4 md:mt-0">
+        <a href="/static/admin_create_user.html" id="createUserLink"
+           class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
+          + Create User
+        </a>
+
+        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg">Logout</button>
+      </div>
+    </header>
+    
+    <!-- Stats -->
+    <section class="mb-8">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">System Overview & Metrics</h2>
+      <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="stat-card bg-white p-5 rounded-xl border border-gray-100 h-28 flex items-center justify-center"><div class="animate-pulse w-full h-6 bg-gray-200 rounded"></div></div>
+        <div class="stat-card bg-white p-5 rounded-xl border border-gray-100 h-28 flex items-center justify-center"><div class="animate-pulse w-full h-6 bg-gray-200 rounded"></div></div>
+        <div class="stat-card bg-white p-5 rounded-xl border border-gray-100 h-28 flex items-center justify-center"><div class="animate-pulse w-full h-6 bg-gray-200 rounded"></div></div>
+        <div class="stat-card bg-white p-5 rounded-xl border border-gray-100 h-28 flex items-center justify-center"><div class="animate-pulse w-full h-6 bg-gray-200 rounded"></div></div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="mb-8 p-6 bg-white rounded-xl stat-card border-l-4 border-blue-500">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Task Scheduling & Creation</h2>
+
+      <div class="flex flex-wrap gap-4 mb-4" id="managerControls">
+        <button id="batchScheduleBtn" class="bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg transition duration-150">Run Batch Scheduler</button>
+        <button id="showCreateTaskBtn" class="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg transition duration-150">+ Create New Task</button>
+        <button id="showDependencyBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition duration-150">Set Dependency</button>
+        <button id="showNotificationsBtn" class="bg-gray-800 hover:bg-gray-900 text-white py-3 px-6 rounded-lg transition duration-150">Notifications</button>
+      </div>
+      <div id="scheduleMessage" class="text-sm small-muted"></div>
+    </section>
+
+    <!-- Tasks list -->
+    <section class="mb-8">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">All Tasks</h2>
+      <div class="bg-white p-6 rounded-xl stat-card overflow-x-auto">
+        <table id="tasksTable" class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assignee</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Due</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tasksBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Create Task Modal -->
+    <div id="taskModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+      <div class="bg-white p-6 rounded-xl w-full max-w-lg">
+        <h3 class="text-xl font-bold mb-4">Create New Task</h3>
+        <form id="taskForm" class="space-y-3">
+          <input id="t_title" placeholder="Title" class="w-full border p-2 rounded" required>
+          <textarea id="t_description" rows="3" placeholder="Description" class="w-full border p-2 rounded"></textarea>
+          <div class="flex gap-2">
+            <select id="t_priority" class="border p-2 rounded w-1/2">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            <!-- Assignee select (optional) -->
+            <select id="t_assignee" class="border p-2 rounded w-1/2">
+              <option value="">— Unassigned —</option>
+            </select>
+          </div>
+
+          <div class="flex gap-2">
+            <input id="t_due" type="datetime-local" class="border p-2 rounded w-1/2" required>
+            <div class="w-1/2"></div>
+          </div>
+          <div id="t_message" class="text-sm small-muted"></div>
+          <div class="flex justify-end gap-2">
+            <button type="button" onclick="closeTaskModal()" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+            <button type="submit" id="createTaskBtn" class="px-4 py-2 rounded bg-green-600 text-white">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Notifications Modal (same as before) -->
+    <div id="notifModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+      <div class="bg-white p-6 rounded-xl w-full max-w-lg">
+        <div class="flex justify-between items-center mb-3">
+        <h3 class="text-xl font-bold">Notifications</h3>
+        <button onclick="closeNotifModal()" class="text-gray-600 hover:text-gray-900">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        </div>
+        <div id="notifList" class="space-y-3 max-h-64 overflow-y-auto">
+        <p class="text-sm text-gray-500">No notifications yet.</p>
+        </div>
+        <div class="mt-4 text-right">
+        <button onclick="markAllRead()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded">Mark all read</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dependency Modal -->
+    <div id="dependencyModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+      <div class="bg-white p-6 rounded-xl w-full max-w-md">
+        <h3 class="text-xl font-bold mb-4">Set Task Dependency</h3>
+        <form id="dependencyForm" class="space-y-3">
+            <select id="dep_prereq" class="w-full border p-2 rounded" required>
+              <option value="">Loading tasks...</option>
+            </select>
+            <select id="dep_dependent" class="w-full border p-2 rounded" required>
+              <option value="">Loading tasks...</option>
+            </select>
+          <div id="dep_message" class="text-sm small-muted"></div>
+          <div class="flex justify-end gap-2">
+            <button type="button" onclick="closeDependencyModal()" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white">Set</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+/* -------------------------
+    Admin Dashboard logic
+    ------------------------- */
+const API = window.location.origin; // same origin, served by Flask
+const tokenKey = 'token';
+const userKey = 'user';
+
+// Helpers
+function getToken() { return localStorage.getItem(tokenKey); }
+function getUser() { try { return JSON.parse(localStorage.getItem(userKey) || 'null'); } catch(e){ return null; } }
+function saveSession(token, user) { localStorage.setItem(tokenKey, token); localStorage.setItem(userKey, JSON.stringify(user)); }
+
+function decodeJwtPayload(token){
+  try{
+    const b = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const json = atob(b);
+    return JSON.parse(decodeURIComponent(escape(json)));
+  }catch(e){ return null; }
+}
+
+function normalizeRole(user){
+  if(!user) return null;
+  let r = user.role;
+  if(!r){
+    const token = getToken();
+    if(token){
+      const p = decodeJwtPayload(token);
+      r = p?.role || p?.user_role || p?.role?.value;
+    }
+  }
+  if(typeof r === 'object' && r?.value) r = r.value;
+  return r;
+}
+
+function requireAdminOrRedirect(){
+  const token = getToken();
+  const user = getUser();
+  const role = normalizeRole(user);
+  console.log('session role:', role);
+  if(!token || role !== 'admin'){
+    localStorage.removeItem(tokenKey);
+    localStorage.removeItem(userKey);
+    window.location.href = '/login';
+    return false;
+  }
+  return true;
+}
+
+function logout(){
+  localStorage.removeItem(tokenKey);
+  localStorage.removeItem(userKey);
+  window.location.href = '/login';
+}
+
+// Generic fetch wrapper
+async function fetchData(path, method='GET', body=null){
+  const token = getToken();
+  if(!token) { console.warn('no token'); window.location.href='/login'; return null; }
+  const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  const opts = { method, headers };
+  if(body && method !== 'GET') opts.body = JSON.stringify(body);
+
+  try {
+    const res = await fetch(API + path, opts);
+    if(res.status === 401 || res.status === 403){
+      console.warn('unauthorized', res.status);
+      localStorage.removeItem(tokenKey);
+      localStorage.removeItem(userKey);
+      window.location.href = '/login';
+      return null;
+    }
+    const txt = await res.text();
+    let data = null;
+    try { data = txt ? JSON.parse(txt) : null; } catch(e){
+      try { data = eval('(' + txt + ')'); } catch(e2){ data = txt;}
+    }
+    if(!res.ok){
+      const err = (data && (data.error || data.message || data.msg)) || `HTTP ${res.status}`;
+      return { error: err, raw: data };
+    }
+    return data;
+  } catch(err){
+    console.error('network error', err);
+    return { error: 'Network error' };
+  }
+}
+
+/* -------------------------
+    STATS
+    ------------------------- */
+async function fetchStats(){
+  const data = await fetchData('/api/stats');
+  if(!data || data.error){ console.error('stats error', data && data.error); return; }
+  renderStats(data);
+}
+
+function renderStats(stats){
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = '';
+
+  const totalEmployees = stats.total_users ?? 0;
+  const tasksByStatus = stats.tasks_by_status || {};
+  const tasksByPriority = stats.tasks_by_priority || {};
+  const topEmployees = Array.isArray(stats.top_employees_by_workload) ? stats.top_employees_by_workload : [];
+
+  let avgWorkload = 0;
+  if (topEmployees.length > 0){
+    const sum = topEmployees.reduce((s, e) => s + (Number(e.workload) || 0), 0);
+    avgWorkload = (sum / topEmployees.length);
+    avgWorkload = Math.round((avgWorkload + Number.EPSILON) * 100) / 100;
+  }
+
+  const cards = [
+    { title: 'Total Employees', value: totalEmployees, color: 'bg-blue-500' },
+    { title: 'Tasks Pending', value: tasksByStatus.pending ?? 0, color: 'bg-yellow-500' },
+    { title: 'Tasks Completed', value: tasksByStatus.completed ?? 0, color: 'bg-green-500' },
+    { title: 'Avg. Workload', value: avgWorkload, color: 'bg-purple-500' }
+  ];
+
+  cards.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = `stat-card ${c.color} text-white p-5 rounded-xl flex items-center transition transform hover:scale-[1.02]`;
+    el.innerHTML = `<div class="mr-4"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="white"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 4.5C7 4.5 2 9.5 2 15s5 10.5 10 10.5 10-5.5 10-10.5S17 4.5 12 4.5zm0 18c-3.6 0-6.8-2-8.5-5.5s-1-7.7 2.5-9.5c3.6-1.8 7.7-1 9.5 2.5 1.8 3.6 1 7.7-2.5 9.5-1.7.8-3.6 1.2-5.5 1.2z"/></svg></div>
+      <div><div class="text-sm opacity-90">${c.title}</div><div class="text-3xl font-bold mt-1">${c.value}</div></div>`;
+    grid.appendChild(el);
+  });
+}
+
+/* -------------------------
+    TASKS LIST
+    ------------------------- */
+async function fetchTasks() {
+    console.log('Fetching tasks...');
+    const data = await fetchData('/api/tasks');
+    const tbody = document.getElementById('tasksBody');
+    tbody.innerHTML = '';
+    
+    if (!data || data.error || !Array.isArray(data)) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-gray-500">
+          ${data && data.error ? 'Error loading tasks: ' + data.error : 'No tasks found.'}
+        </td></tr>`;
+        return;
+    }
+
+data.forEach(task => {
+    const row = tbody.insertRow();
+    row.className = 'hover:bg-gray-100 transition duration-100';
+
+    // decide admin visibility
+    const currentUser = getUser();
+    const currentRole = normalizeRole(currentUser);
+
+    // prepare assign button if unassigned/pending
+    let assignHtml = '';
+    if(!task.assignee_id || task.assignee_id === null || (task.status && task.status.toLowerCase() === 'pending')){
+      assignHtml = `<button onclick="openAssignPrompt(${task.id})" class="text-xs bg-indigo-200 text-indigo-700 py-1 px-3 rounded hover:bg-indigo-300 transition">Assign</button>`;
+    }
+
+    // admin-only delete button
+    let deleteHtml = '';
+    if(currentRole === 'admin'){
+      deleteHtml = `<button onclick="deleteTask(${task.id})" class="text-xs bg-red-200 text-red-700 py-1 px-3 rounded hover:bg-red-300 transition ml-2">Delete</button>`;
+    }
+
+    row.innerHTML = `
+        <td class="px-4 py-2">${task.id}</td>
+        <td class="px-4 py-2 font-medium">${escapeHtml(task.title)}</td>
+        <td class="px-4 py-2 capitalize"><span class="text-xs font-semibold px-2 py-1 rounded-full ${getPriorityColor(task.priority)}">${task.priority}</span></td>
+        <td class="px-4 py-2 capitalize"><span class="text-xs font-semibold px-2 py-1 rounded-full ${getStatusColor(task.status)}">${task.status}</span></td>
+        <td class="px-4 py-2">${task.assignee_name || 'Unassigned'}</td>
+        <td class="px-4 py-2">${formatDueDate(task.due_date)}</td>
+        <td class="px-4 py-2">
+            ${String(task.status).toLowerCase() === 'pending' ? `<button onclick="autoAssign(${task.id})" class="text-xs bg-indigo-200 text-indigo-700 py-1 px-3 rounded hover:bg-indigo-300 transition">Auto-Assign</button>` : '—'}
+            ${assignHtml}
+            ${deleteHtml}
+        </td>
+    `;
+});
+
+    function getPriorityColor(p) {
+        if (!p) return 'bg-gray-100 text-gray-700';
+        const priority = p.toLowerCase();
+        if (priority === 'high') return 'bg-red-100 text-red-700';
+        if (priority === 'medium') return 'bg-yellow-100 text-yellow-700';
+        return 'bg-green-100 text-green-700';
+    }
+    function getStatusColor(s) {
+        if (!s) return 'bg-gray-100 text-gray-700';
+        const status = s.toLowerCase();
+        if (status === 'completed') return 'bg-teal-100 text-teal-700';
+        if (status === 'assigned') return 'bg-blue-100 text-blue-700';
+        if (status === 'pending') return 'bg-pink-100 text-pink-700';
+        if (status === 'blocked') return 'bg-red-100 text-red-700';
+        return 'bg-gray-100 text-gray-700';
+
+    }
+}
+
+/* -------------------------
+    CREATE TASK
+    ------------------------- */
+function showTaskModal(){ 
+  document.getElementById('taskModal').classList.remove('hidden'); 
+  document.getElementById('taskModal').classList.add('modal-active'); 
+  document.getElementById('taskForm').reset(); 
+  setMinDueNow();
+  document.getElementById('t_message').textContent=''; 
+}
+function closeTaskModal(){ 
+  document.getElementById('taskModal').classList.remove('modal-active'); 
+  document.getElementById('taskModal').classList.add('hidden'); 
+}
+
+async function createTask(e){
+  e.preventDefault();
+  const title = document.getElementById('t_title').value.trim();
+  const description = document.getElementById('t_description').value.trim();
+  const priority = document.getElementById('t_priority').value;
+  const dueLocal = document.getElementById('t_due').value; // "YYYY-MM-DDTHH:MM"
+  const assigneeSel = document.getElementById('t_assignee');
+  const msg = document.getElementById('t_message');
+
+  if(!title || !dueLocal){ msg.textContent = 'Title and due date/time required.'; return; }
+  msg.textContent = 'Creating task...';
+
+  // Convert datetime-local (local time) to ISO 8601 UTC string
+  // Note: new Date(dueLocal) interprets the value as local time in modern browsers
+  let due_iso = null;
+  try {
+    const dt = new Date(dueLocal);
+    if (isNaN(dt.getTime())) throw new Error('Invalid date');
+    due_iso = dt.toISOString(); // backend-friendly ISO 8601
+  } catch (err) {
+    msg.textContent = 'Invalid due date/time format.';
+    return;
+  }
+
+  const payload = { title, description, priority, due_date: due_iso };
+  if(assigneeSel && assigneeSel.value) payload.assignee_id = parseInt(assigneeSel.value, 10);
+
+  const res = await fetchData('/api/tasks', 'POST', payload);
+  if(!res){ msg.textContent = 'Network error'; return; }
+  if(res.error){ msg.textContent = 'Error: ' + res.error; return; }
+
+  msg.textContent = 'Task created successfully.';
+  document.getElementById('taskForm').reset();
+  setTimeout(()=>{
+    closeTaskModal();
+    fetchTasks();
+    fetchStats();
+  }, 800);
+}
+
+async function deleteTask(taskId){
+  if(!confirm(`Permanently delete task ${taskId}? This cannot be undone.`)) return;
+  document.getElementById('scheduleMessage').textContent = `Deleting task ${taskId}...`;
+  const res = await fetchData(`/api/tasks/${taskId}`, 'DELETE');
+  document.getElementById('scheduleMessage').textContent = '';
+  if(!res){
+    alert('Network error while deleting task.');
+    return;
+  }
+  if(res.error){
+    alert('Error deleting task: ' + res.error);
+    return;
+  }
+  alert(res.msg || 'Task deleted');
+  fetchTasks();
+  fetchStats();
+}
+
+/* -------------------------
+    ASSIGN PROMPT (ADMIN)
+    ------------------------- */
+window.assignableUsers = []; // Renamed from employeeList for clarity
+async function loadAssignableUsers(){ // Renamed from loadEmployeesForAdmin
+  const token = getToken();
+  if(!token) return;
+  try {
+    const res = await fetch(API + '/api/users', { method:'GET', headers:{ 'Authorization':'Bearer '+token }});
+    if(!res.ok) return;
+    const data = await res.json();
+ 
+ // --- THE CRITICAL FIX IS HERE ---
+    const assignable = Array.isArray(data) ? data.filter(u => {
+      const role = (u.role || '').toLowerCase();
+      return role === 'employee' || role === 'manager'; // <--- ADDED 'manager'
+ }) : [];
+ // --------------------------------
+
+    window.assignableUsers = assignable; // Use new list name
+    const sel = document.getElementById('t_assignee');
+    if(sel){
+      sel.innerHTML = '<option value=\"\">— Unassigned —</option>';
+      assignable.forEach(e=>{ // Use new list name
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        opt.textContent = `${e.id} — ${e.name} (${e.email})`;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e){
+    console.warn('loadAssignableUsers error', e); // Updated function name
+   }
+}
+async function openAssignPrompt(taskId){
+  if(!window.assignableUsers || window.assignableUsers.length === 0) await loadAssignableUsers();
+  if(!window.assignableUsers || window.assignableUsers.length === 0){ alert('No employees available to assign.'); return; }
+  const choices = window.assignableUsers.map(e => `${e.id}: ${e.name}`).join('\n');
+  const picked = prompt(`Assign Task ${taskId}\n\nAvailable users (id: name):\n${choices}\n\nEnter the numeric ID to assign:`);
+  if(picked === null) return;
+  const id = parseInt(picked.trim(), 10);
+  if(isNaN(id)){ alert('Invalid id'); return; }
+  if(!confirm(`Assign task ${taskId} to user ID ${id}?`)) return;
+  const res = await fetchData('/api/tasks/assign', 'POST', { task_id: taskId, assignee_id: id });
+  if(!res || res.error){ alert((res && res.error) || 'Assignment failed'); return; }
+  alert('Task assigned successfully.');
+  fetchTasks(); fetchStats();
+}
+
+/* -------------------------
+    DEPENDENCIES
+    ------------------------- */
+async function populateDependencySelects() {
+  const token = localStorage.getItem('token');
+  const prere = document.getElementById('dep_prereq');
+  const dep   = document.getElementById('dep_dependent');
+  if(!prere || !dep) return;
+  prere.innerHTML = '<option value="">Loading...</option>';
+  dep.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const res = await fetch('/api/tasks', { headers: { 'Authorization': 'Bearer ' + token }});
+    const tasks = await res.json();
+    if(!Array.isArray(tasks)) { prere.innerHTML = dep.innerHTML = '<option value="">No tasks</option>'; return; }
+    prere.innerHTML = '<option value="">Select prerequisite task...</option>';
+    dep.innerHTML  = '<option value="">Select dependent task...</option>';
+    tasks.forEach(t => {
+      // show only pending tasks (optional)
+      if(t.status && t.status.toLowerCase() === 'completed') return;
+      const label = `${t.id} — ${t.title}`;
+      prere.insertAdjacentHTML('beforeend', `<option value="${t.id}">${label}</option>`);
+      dep.insertAdjacentHTML('beforeend', `<option value="${t.id}">${label}</option>`);
+    });
+  } catch (err) {
+    prere.innerHTML = dep.innerHTML = '<option value="">Error loading</option>';
+  }
+}
+
+async function showDependencyModal(){
+  await populateDependencySelects();
+  document.getElementById('dependencyModal').classList.remove('hidden');
+  document.getElementById('dependencyModal').classList.add('modal-active');
+  document.getElementById('dependencyForm').reset();
+  document.getElementById('dep_message').textContent='';
+}
+
+async function createDependency(e){
+  e.preventDefault();
+  const prereq = parseInt(document.getElementById('dep_prereq').value,10);
+  const dependent = parseInt(document.getElementById('dep_dependent').value,10);
+  const msg = document.getElementById('dep_message');
+  if(isNaN(prereq) || isNaN(dependent)){ msg.textContent = 'Both tasks must be selected.'; return; }
+  msg.textContent = 'Setting dependency...';
+
+  const token = localStorage.getItem('token');
+  const res = await fetch('/api/tasks/dependencies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ prereq_id: prereq, dependent_id: dependent })
+  });
+  const data = await res.json();
+  if(!res.ok){ msg.textContent = data.msg || data.error || 'Could not create dependency'; return; }
+  msg.textContent = data.msg || 'Dependency created';
+  setTimeout(()=>{ closeDependencyModal(); fetchTasks(); }, 900);
+}
+// add this near your other modal helpers (e.g. after closeTaskModal)
+function closeDependencyModal(){
+  const modal = document.getElementById('dependencyModal');
+  if(!modal) return;
+  modal.classList.remove('modal-active');
+  modal.classList.add('hidden');
+}
+
+
+/* -------------------------
+    BATCH / AUTO-ASSIGN
+    ------------------------- */
+async function batchSchedule(){
+  console.log('Batch Scheduler initiated. Proceeding with auto-assignment...');
+  const btn = document.getElementById('batchScheduleBtn');
+  btn.disabled = true;
+  document.getElementById('scheduleMessage').textContent = 'Running scheduler...';
+  const res = await fetchData('/api/tasks/batch-schedule', 'POST');
+  btn.disabled = false;
+  if(!res){ document.getElementById('scheduleMessage').textContent = 'Network error'; return; }
+  if(res.error){ document.getElementById('scheduleMessage').textContent = 'Error: ' + res.error; return; }
+  document.getElementById('scheduleMessage').textContent = res.message || 'Batch scheduling complete.';
+  fetchTasks(); fetchStats();
+}
+
+async function autoAssign(taskId){
+  console.log(`Auto-assigning task ${taskId}.`);
+  const res = await fetchData(`/api/tasks/auto-assign/${taskId}`, 'POST');
+  if(res && res.error){ console.error('Error during auto-assign:', res.error); } else { console.log(res && res.message ? res.message : `Task ${taskId} assigned.`); }
+  fetchTasks(); fetchStats();
+}
+
+/* -------------------------
+    Notifications
+    ------------------------- */
+async function fetchNotifications(){
+  console.log("Notifications fetch utility ready.");
+}
+
+async function openNotifModal(){
+  document.getElementById('notifModal').classList.remove('hidden');
+  document.getElementById('notifModal').classList.add('modal-active');
+  const list = document.getElementById('notifList');
+  list.innerHTML = '<p class="text-sm text-gray-500">Loading...</p>';
+  
+  const data = await fetchData('/api/notifications');
+  if(!data || data.error){
+    list.innerHTML = `<p class="text-sm text-red-600">Unable to load notifications</p>`;
+    return;
+  }
+  let items = [];
+  if(Array.isArray(data)) items = data;
+  else if(data.notifications) items = data.notifications;
+  else if(data.data && Array.isArray(data.data)) items = data.data;
+  else {
+    const arr = Object.values(data).find(v => Array.isArray(v));
+    items = arr || [];
+  }
+  if(items.length === 0){ list.innerHTML = '<p class="text-sm text-gray-500">No notifications</p>'; return; }
+  list.innerHTML = '';
+  items.forEach(n => {
+    const when = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+    const msg = escapeHtml(n.message || n.msg || n.body || '');
+    const html = `<div class="p-3 border rounded"><div class="text-sm">${msg}</div><div class="text-xs text-gray-500 mt-1">${when}</div></div>`;
+    list.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function closeNotifModal(){ 
+  document.getElementById('notifModal').classList.remove('modal-active'); 
+  document.getElementById('notifModal').classList.add('hidden'); 
+}
+
+async function markAllRead(){
+  const res = await fetchData('/api/notifications/mark-all-read', 'POST', {});
+  if(res && !res.error) openNotifModal(); // reload
+}
+
+/* -------------------------
+    Utilities
+    ------------------------- */
+function escapeHtml(unsafe){
+  return (unsafe+'').replace(/[&<>\"'`=\/]/g, function(s){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',"/":'&#x2F;','`':'&#x60','=':'&#x3D'}[s];
+  });
+}
+
+function formatDueDate(d){
+  if(!d) return 'N/A';
+  try {
+    const dt = new Date(d);
+    if(isNaN(dt.getTime())) return d;
+    return dt.toLocaleString();
+  } catch(e){
+    return d;
+  }
+}
+
+// set minimum for datetime-local to now (rounded to minute)
+function setMinDueNow(){
+  const el = document.getElementById('t_due');
+  if(!el) return;
+  const now = new Date();
+  now.setSeconds(0,0);
+  const offsetMin = now.getTimezoneOffset();
+  const localIso = new Date(now.getTime() - (offsetMin * 60000)).toISOString().slice(0,16);
+  el.min = localIso; // "YYYY-MM-DDTHH:MM"
+}
+
+/* -------------------------
+    Init - Event Listeners
+    ------------------------- */
+
+document.getElementById('batchScheduleBtn').addEventListener('click', batchSchedule);
+document.getElementById('showCreateTaskBtn').addEventListener('click', showTaskModal);
+document.getElementById('taskForm').addEventListener('submit', createTask);
+document.getElementById('showDependencyBtn').addEventListener('click', showDependencyModal);
+document.getElementById('dependencyForm').addEventListener('submit', createDependency);
+document.getElementById('showNotificationsBtn').addEventListener('click', openNotifModal);
+
+async function initDashboard(){
+  if(!requireAdminOrRedirect()) return;
+  await fetchStats();
+  await fetchTasks();
+  await loadAssignableUsers();
+  await fetchNotifications();
+}
+
+window.addEventListener('load', initDashboard);
+</script>
+</body>
+</html>

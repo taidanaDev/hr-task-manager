@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Employee Task Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f4f7f9; }
+        .card { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        .small-muted { color:#6b7280; font-size:0.9rem; }
+        .disabled { opacity:0.6; pointer-events:none; }
+        .modal-active { display:flex !important; }
+    </style>
+</head>
+
+
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="flex justify-between items-center py-4 border-b border-gray-200 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                </svg>
+                My Tasks & Workload
+            </h1>
+            <div class="flex items-center gap-3">
+                <button id="showNotificationsBtn" class="bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
+                    Notifications
+                </button>
+                <div id="msg" class="small-muted text-sm"></div>
+                                    <button onclick="window.location.href='/static/change_password.html'"
+                        class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded">
+                        Change Password
+                    </button>
+                <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
+                    Logout
+                </button>
+
+            </div>
+        </header>
+
+        <!-- Task List -->
+        <section>
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Assigned Tasks</h2>
+            <div id="workloadSummary" class="bg-white p-4 mb-6 rounded-xl border-l-4 border-blue-500 text-gray-700 font-medium">
+                Loading workload...
+            </div>
+            <div class="card bg-white p-6 rounded-xl overflow-x-auto">
+                <table id="tasksTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksBody" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-500">Loading tasks...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Notifications Modal -->
+    <div id="notifModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+      <div class="bg-white p-6 rounded-xl w-full max-w-lg">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-xl font-bold">Notifications</h3>
+          <button id="closeNotifBtn" class="text-gray-600 hover:text-gray-900">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div id="notifList" class="space-y-3 max-h-64 overflow-y-auto">
+          <p class="text-sm text-gray-500">Loading...</p>
+        </div>
+        <div class="mt-4 text-right flex justify-between items-center">
+          <div id="notifCount" class="text-sm text-gray-600"></div>
+          <div>
+            <button id="markAllReadBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded mr-2">Mark all read</button>
+            <button id="closeNotifBtn2" class="px-4 py-2 bg-gray-200 rounded">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<script>
+const API_BASE_URL = window.location.origin;
+
+// session helpers (consistent with your auth.js)
+function getToken(){ return localStorage.getItem('token'); }
+function getUser(){ try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch(e){ return null; } }
+function clearSession(){ localStorage.removeItem('token'); localStorage.removeItem('user'); }
+
+// decode jwt payload safely
+function decodeJwtPayload(token){
+  try {
+    const b = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const json = atob(b);
+    return JSON.parse(decodeURIComponent(escape(json)));
+  } catch(e){ return null; }
+}
+
+// centralized fetch that returns { ok, status, data } and handles 401/403
+async function fetchData(path, method='GET', body=null) {
+    const token = getToken();
+    if(!token){
+        redirectToLogin();
+        return { ok:false, status:401, data:{ msg:'no token' } };
+    }
+    const headers = { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + token };
+    const opts = { method, headers };
+    if(body && method !== 'GET') opts.body = JSON.stringify(body);
+
+    try {
+        const res = await fetch(API_BASE_URL + path, opts);
+        let data = null;
+        try { data = await res.json(); } catch(e) { data = null; }
+        if(res.status === 401 || res.status === 403){
+            clearSession();
+            redirectToLogin();
+            return { ok:false, status: res.status, data };
+        }
+        return { ok: res.ok, status: res.status, data };
+    } catch(err){
+        console.error('Network error', err);
+        return { ok:false, status:0, data: { msg: 'network_error' } };
+    }
+}
+
+function redirectToLogin(){
+    window.location.href = '/login';
+}
+
+function logout(){
+    clearSession();
+    window.location.href = '/login';
+}
+
+document.getElementById('logoutBtn').addEventListener('click', logout);
+document.getElementById('showNotificationsBtn').addEventListener('click', openNotifModal);
+document.getElementById('closeNotifBtn').addEventListener('click', closeNotifModal);
+document.getElementById('closeNotifBtn2').addEventListener('click', closeNotifModal);
+document.getElementById('markAllReadBtn').addEventListener('click', markAllRead);
+
+function normalizeRole(){
+  const user = getUser();
+  if(user && user.role) {
+    return (typeof user.role === 'string' ? user.role : (user.role.value || String(user.role))).toLowerCase();
+  }
+  const t = getToken();
+  if(t){
+    const p = decodeJwtPayload(t);
+    return (p?.role || p?.user_role || '').toLowerCase();
+  }
+  return null;
+}
+
+/* ------------ Notifications ------------ */
+
+async function fetchNotifications(){
+  const res = await fetchData('/api/notifications', 'GET');
+  if(!res.ok){
+    return { error: (res.data && (res.data.msg||res.data.message)) || 'Unable to fetch notifications' };
+  }
+  // Accept multiple shapes: array or { notifications: [...] }
+  let items = [];
+  if(Array.isArray(res.data)) items = res.data;
+  else if(res.data && Array.isArray(res.data.notifications)) items = res.data.notifications;
+  else if(res.data && Array.isArray(res.data.data)) items = res.data.data;
+  else {
+    const arr = Object.values(res.data || {}).find(v => Array.isArray(v));
+    items = arr || [];
+  }
+  return { ok:true, items };
+}
+
+async function openNotifModal(){
+  const modal = document.getElementById('notifModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('modal-active');
+  const list = document.getElementById('notifList');
+  const countEl = document.getElementById('notifCount');
+  list.innerHTML = '<p class="text-sm text-gray-500">Loading...</p>';
+  countEl.textContent = '';
+
+  const r = await fetchNotifications();
+  if(!r.ok){
+    list.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(r.error)}</p>`;
+    return;
+  }
+  const items = r.items;
+  if(!items || items.length === 0){
+    list.innerHTML = '<p class="text-sm text-gray-500">No notifications</p>';
+    countEl.textContent = '0 unread';
+    return;
+  }
+  list.innerHTML = '';
+  let unread = 0;
+  items.forEach(n => {
+    const when = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+    const isRead = !!n.read;
+    if(!isRead) unread++;
+    const html = `<div class="p-3 border rounded ${isRead ? '' : 'bg-indigo-50'}">
+      <div class="text-sm">${escapeHtml(n.message || n.msg || n.body || '')}</div>
+      <div class="text-xs text-gray-500 mt-1">${escapeHtml(when)}</div>
+    </div>`;
+    list.insertAdjacentHTML('beforeend', html);
+  });
+  countEl.textContent = `${unread} unread`;
+}
+
+function closeNotifModal(){
+  const modal = document.getElementById('notifModal');
+  if(!modal) return;
+  modal.classList.remove('modal-active');
+  modal.classList.add('hidden');
+}
+
+async function markAllRead(){
+  const btn = document.getElementById('markAllReadBtn');
+  btn.disabled = true;
+  const res = await fetchData('/api/notifications/mark-all-read', 'POST', {});
+  if(!res.ok){
+    showMsg((res.data && (res.data.msg || res.data.message)) || 'Failed to mark notifications read', 'error');
+    btn.disabled = false;
+    return;
+  }
+  await openNotifModal(); // reload to reflect read state
+  showMsg('Notifications marked read', 'success');
+  btn.disabled = false;
+}
+
+/* ------------ Tasks fetch & render ------------ */
+
+function escapeHtml(unsafe){
+  return (unsafe+'').replace(/[&<>"'`=\/]/g, function(s){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',"/":'&#x2F;','`':'&#x60','=':'&#x3D'}[s];
+  });
+}
+
+function showMsg(txt, type='info'){
+  const el = document.getElementById('msg');
+  el.textContent = txt || '';
+  el.className = type === 'error' ? 'text-red-600 small-muted' : (type === 'success' ? 'text-green-600 small-muted' : 'small-muted');
+}
+
+async function fetchEmployeeTasks(){
+    showMsg('Loading tasks...', 'info');
+    const res = await fetchData('/api/tasks', 'GET');
+    const summaryDiv = document.getElementById('workloadSummary');
+
+    if(!res.ok){
+        const err = res.data && (res.data.msg || res.data.message) || 'Unable to fetch tasks.';
+        summaryDiv.textContent = err;
+        showMsg(err, 'error');
+        renderTasks([]); 
+        return;
+    }
+
+    const tasks = Array.isArray(res.data) ? res.data : (res.data.tasks || []);
+    renderTasks(tasks);
+
+    const pendingCount = tasks.filter(t => (t.status || '').toLowerCase() !== 'completed').length;
+    const completedCount = tasks.filter(t => (t.status || '').toLowerCase() === 'completed').length;
+
+       // Display the user's name (prefer localStorage.user.name, then token payload)
+    const storedUser = getUser();
+    const token = getToken();
+    const tokenPayload = token ? decodeJwtPayload(token) : null;
+// Lines 209-222: Display Name Logic
+    let displayName = null;
+    
+    // 1. Check Stored User Object for 'name'
+    if (storedUser && storedUser.name) {
+        displayName = storedUser.name;
+    } 
+    // 2. Check JWT Token Payload for 'name'
+    else if (tokenPayload && tokenPayload.name) {
+        displayName = tokenPayload.name;
+    } 
+    // 3. Fallback
+    else {
+        displayName = 'Employee';
+    }
+
+    // --- Step 3: Set the Summary Content ---
+    summaryDiv.innerHTML = `
+        <span class="font-bold text-lg">Employee: ${escapeHtml(displayName)}</span> 
+        <span class="small-muted">|</span>
+        <span class="text-yellow-700 ml-4 font-semibold">${pendingCount} Pending Tasks</span> 
+        <span class="small-muted">|</span>
+        <span class="text-green-700 font-semibold">${completedCount} Completed Tasks</span>`;
+    showMsg('', 'info');
+}
+function getPriorityBadge(priority){
+    if(!priority) return 'bg-gray-100 text-gray-700';
+    const p = (priority+'').toLowerCase();
+    if(p === 'high') return 'bg-red-100 text-red-700';
+    if(p === 'medium') return 'bg-yellow-100 text-yellow-700';
+    return 'bg-green-100 text-green-700';
+}
+
+function getStatusBadge(status){
+    if(!status) return 'bg-gray-100 text-gray-700';
+    const s = (status+'').toLowerCase();
+    if(s === 'completed') return 'bg-teal-100 text-teal-700';
+    if(s === 'assigned') return 'bg-blue-100 text-blue-700';
+    if(s === 'pending') return 'bg-pink-100 text-pink-700';
+    if(s === 'in_progress' || s === 'in progress') return 'bg-yellow-100 text-yellow-700';
+    if(s === 'blocked') return 'bg-red-100 text-red-700';
+    return 'bg-gray-100 text-gray-700';
+}
+
+function createActionButtons(task){
+    const status = (task.status || '').toLowerCase();
+    let actions = '';
+    if(status === 'pending' || status === 'assigned'){
+        actions += `<button data-action="start" data-id="${task.id}" class="start-btn text-yellow-600 hover:text-yellow-800 mr-3 p-1 rounded transition duration-150">Start</button>`;
+    }
+    if(status === 'in_progress' || status === 'assigned'){
+        actions += `<button data-action="complete" data-id="${task.id}" class="complete-btn text-green-600 hover:text-green-800 p-1 rounded transition duration-150">Complete</button>`;
+    }
+    if(status === 'completed'){
+        actions = '<span class="text-green-700 font-semibold">Done</span>';
+    }
+    if(status === 'blocked'){
+        actions = '<span class="text-red-700 font-semibold">Blocked</span>';
+    }
+    return actions;
+}
+
+function renderTasks(tasks){
+    const tbody = document.getElementById('tasksBody');
+    tbody.innerHTML = '';
+    if(!tasks || tasks.length === 0){
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No tasks currently assigned.</td></tr>';
+        return;
+    }
+
+    tasks.forEach(task => {
+        const due = task.due_date ? new Date(task.due_date).toLocaleDateString() : 'N/A';
+        const priority = task.priority || 'medium';
+        const status = task.status || 'pending';
+        const actions = createActionButtons(task);
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50 transition duration-100';
+        tr.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(String(task.id || '—'))}</td>
+            <td class="px-6 py-4 text-sm text-gray-700">${escapeHtml(task.title || '—')}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span class="text-xs font-semibold px-2 py-1 rounded-full ${getPriorityBadge(priority)}">${escapeHtml(priority)}</span></td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(due)}</td>
+            <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(status)} capitalize">${escapeHtml(status.replace('_', ' '))}</span></td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${actions}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // attach event listeners to action buttons
+    tbody.querySelectorAll('button[data-action]').forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
+            const action = btn.getAttribute('data-action');
+            const id = btn.getAttribute('data-id');
+            const confirmText = action === 'start' ? `Start task ${id}?` : `Mark task ${id} complete?`;
+            if(!confirm(confirmText)) return;
+            const row = btn.closest('tr');
+            if(row) row.classList.add('opacity-60');
+            try {
+                if(action === 'start') {
+                    await startTask(id);
+                } else if(action === 'complete') {
+                    await completeTask(id);
+                }
+            } finally {
+                if(row) row.classList.remove('opacity-60');
+            }
+        });
+    });
+}
+
+/* ------------ Task action functions (call server endpoints) ------------ */
+
+async function startTask(taskId){
+    showMsg(`Starting task ${taskId}...`, 'info');
+    const res = await fetchData(`/api/tasks/start/${taskId}`, 'POST', {});
+    if(!res.ok){
+        const err = res.data && (res.data.msg || res.data.message) || 'Failed to start task.';
+        showMsg(err, 'error');
+        return;
+    }
+    showMsg(`Task ${taskId} started.`, 'success');
+    await fetchEmployeeTasks();
+}
+
+async function completeTask(taskId){
+    showMsg(`Marking task ${taskId} complete...`, 'info');
+    const res = await fetchData(`/api/tasks/mark-complete/${taskId}`, 'POST', {});
+    if(!res.ok){
+        const err = res.data && (res.data.msg || res.data.message) || 'Failed to mark complete.';
+        showMsg(err, 'error');
+        return;
+    }
+    showMsg(`Task ${taskId} marked complete.`, 'success');
+    await fetchEmployeeTasks();
+}
+
+/* ------------ Init & role enforcement ------------ */
+
+async function initDashboard(){
+    const token = getToken();
+    if(!token){
+        redirectToLogin();
+        return;
+    }
+
+    const role = normalizeRole();
+    if(!role){
+        redirectToLogin();
+        return;
+    }
+
+    if(role !== 'employee'){
+        if(role === 'admin') { window.location.href = '/static/admin.html'; return; }
+        if(role === 'manager'){ window.location.href = '/static/manager.html'; return; }
+        redirectToLogin(); return;
+    }
+
+    await fetchEmployeeTasks();
+}
+
+window.addEventListener('load', initDashboard);
+</script>
+</body>
+</html>

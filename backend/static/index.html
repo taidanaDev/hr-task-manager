@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Task Assignment System</title>
+    <!-- Use Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+        .card {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="card bg-white p-8 rounded-xl max-w-lg w-full text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">HR Task Assignment System</h1>
+        <p class="text-gray-600 mb-8">Welcome. Use the buttons below to go to login or dashboards.</p>
+        
+        <div class="space-y-4">
+            <a href="/login" class="block w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition duration-150">
+                Log In
+            </a>
+            
+            <p class="text-sm text-gray-500 pt-4">Dashboards:</p>
+            
+            <a href="/static/admin.html" class="block w-full bg-green-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-600 transition duration-150">
+                Admin
+            </a>
+            <a href="/static/manager.html" class="block w-full bg-yellow-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-yellow-600 transition duration-150">
+                Manager
+            </a>
+            <a href="/static/employee.html" class="block w-full bg-indigo-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-600 transition duration-150">
+                Employee
+            </a>
+        </div>
+
+        <p class="mt-8 text-xs text-gray-400">HR Task Manager</p>
+    </div>
+</body>
+</html>

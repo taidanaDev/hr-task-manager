@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Team Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f4f7f9; }
+        .card { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        .small-muted { color: #6b7280; font-size: 0.9rem; }
+        .modal-active { display: flex !important; }
+    </style>
+</head>
+
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="flex justify-between items-center py-4 border-b border-gray-200 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18H4v-3a6 6 0 0112 0v3z" />
+                </svg>
+                Team Management & Oversight
+            </h1>
+            <div class="flex items-center gap-3">
+                <button id="showNotificationsBtn" class="bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
+                    Notifications
+                </button>
+                <button onclick="window.location.href='/static/change_password.html'"
+                        class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded">
+                    Change Password
+                </button>
+                <div id="managerMessage" class="small-muted"></div>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 shadow-md">
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <section class="mb-8">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Team Workload Summary</h2>
+            <div id="teamWorkloadGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="card bg-white p-5 rounded-xl border border-gray-100 animate-pulse h-24"></div>
+                <div class="card bg-white p-5 rounded-xl border border-gray-100 animate-pulse h-24"></div>
+                <div class="card bg-white p-5 rounded-xl border border-gray-100 animate-pulse h-24"></div>
+                <div class="card bg-white p-5 rounded-xl border border-gray-100 animate-pulse h-24"></div>
+            </div>
+        </section>
+
+        <section class="mb-8 p-6 bg-white rounded-xl stat-card border-l-4 border-blue-500">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Task Scheduling & Creation</h2>
+
+            <div class="flex flex-wrap gap-4 mb-4">
+                <button id="batchScheduleBtn" class="bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg transition duration-150">Run Batch Scheduler</button>
+                <button id="showCreateTaskBtn" class="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg transition duration-150">+ Create New Task</button>
+                <button id="showDependencyBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition duration-150">Set Dependency</button>
+            </div>
+            <div id="scheduleMessage" class="text-sm small-muted"></div>
+        </section>
+
+        <section>
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Team Tasks</h2>
+            <div class="card bg-white p-6 rounded-xl overflow-x-auto">
+                <table id="tasksTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assignee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksBody" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-500">Loading team tasks...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div id="taskModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl w-full max-w-lg">
+            <h3 class="text-xl font-bold mb-4">Create New Task</h3>
+            <form id="taskForm" class="space-y-3">
+                <input id="t_title" placeholder="Title" class="w-full border p-2 rounded" required>
+                <textarea id="t_description" rows="3" placeholder="Description" class="w-full border p-2 rounded"></textarea>
+                <div class="flex gap-2">
+                    <select id="t_priority" class="border p-2 rounded w-1/2">
+                        <option value="high">High</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+
+                    <select id="t_assignee" class="border p-2 rounded w-1/2">
+                        <option value="">— Unassigned —</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-2">
+                    <input id="t_due" type="datetime-local" class="border p-2 rounded w-1/2" required>
+                    <div class="w-1/2"></div>
+                </div>
+                <div id="t_message" class="text-sm small-muted"></div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="closeTaskModal()" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+                    <button type="submit" id="createTaskBtn" class="px-4 py-2 rounded bg-green-600 text-white">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="notifModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl w-full max-w-lg">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-xl font-bold">Notifications</h3>
+                <button onclick="closeNotifModal()" class="text-gray-600 hover:text-gray-900">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="notifList" class="space-y-3 max-h-64 overflow-y-auto">
+                <p class="text-sm text-gray-500">Loading...</p>
+            </div>
+            <div class="mt-4 text-right">
+                <button onclick="markAllRead()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded">Mark all read</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dependencyModal" class="fixed inset-0 bg-gray-700 bg-opacity-40 hidden items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Set Task Dependency</h3>
+            <form id="dependencyForm" class="space-y-3">
+                <select id="dep_prereq" class="w-full border p-2 rounded" required>
+                    <option value="">Loading tasks...</option>
+                </select>
+                <select id="dep_dependent" class="w-full border p-2 rounded" required>
+                    <option value="">Loading tasks...</option>
+                </select>
+                <div id="dep_message" class="text-sm small-muted"></div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="closeDependencyModal()" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white">Set</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<script>
+    const API_BASE_URL = window.location.origin;
+
+    function getAuthToken() {
+        return localStorage.getItem('token');
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+    }
+
+    async function fetchData(url, method = 'GET', body = null) {
+        const token = getAuthToken();
+        if (!token) {
+            console.warn('No authentication token found. Redirecting to login.');
+            logout();
+            return { error: 'no_token' };
+        }
+
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        };
+
+        try {
+            const options = { method, headers };
+            if (body && method !== 'GET') options.body = JSON.stringify(body);
+
+            const response = await fetch(`${API_BASE_URL}${url}`, options);
+
+            if (response.status === 401) {
+                console.error('Session expired or unauthorized (401). Logging out.');
+                logout();
+                return { error: 'unauthorized' };
+            }
+
+            const text = await response.text();
+            let data;
+            try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+
+            if (!response.ok) {
+                const errMsg = data && (data.error || data.msg || data.message) || `HTTP ${response.status}`;
+                console.warn('API returned error', response.status, errMsg);
+                return { error: errMsg, status: response.status, raw: data };
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Network Error:', error);
+            return { error: 'network_error' };
+        }
+    }
+
+    function decodeJwtPayload(token) {
+        try {
+            const b = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const json = atob(b);
+            return JSON.parse(decodeURIComponent(escape(json)));
+        } catch (e) { return null; }
+    }
+
+    function normalizeRole() {
+        try {
+            const u = JSON.parse(localStorage.getItem('user') || 'null');
+            if (u && u.role) {
+                if (typeof u.role === 'string') return u.role;
+                if (typeof u.role === 'object' && u.role.value) return u.role.value;
+            }
+            const t = getAuthToken();
+            if (t) {
+                const p = decodeJwtPayload(t);
+                return p?.role || p?.user_role || p?.role?.value || null;
+            }
+            return null;
+        } catch (e) { return null; }
+    }
+
+    function requireManagerOrRedirect() {
+        const token = getAuthToken();
+        const role = (normalizeRole() || '').toLowerCase();
+        if (!token || (role !== 'manager' && role !== 'admin')) {
+            logout();
+            return false;
+        }
+        return true;
+    }
+
+    async function fetchTeamWorkload() {
+        const data = await fetchData('/api/manager/workload/');
+        if (!data) return;
+        if (data.error) {
+            console.warn('Workload fetch error', data.error);
+            const grid = document.getElementById('teamWorkloadGrid');
+            if (grid) grid.innerHTML = `<p class="text-red-600 p-4">Unable to load workload: ${escapeHtml(String(data.error))}</p>`;
+            return;
+        }
+        const workloads = data.team_workload || data.workloads || [];
+        renderTeamWorkload(Array.isArray(workloads) ? workloads : []);
+    }
+
+    function getUserNameById(id) {
+        if (!id && id !== 0) return null;
+        try {
+            if (window.teamList && Array.isArray(window.teamList)) {
+                const found = window.teamList.find(u => Number(u.id) === Number(id));
+                if (found) return found.name || found.full_name || `${found.id}`;
+            }
+        } catch (e) { }
+        return null;
+    }
+
+    function renderTeamWorkload(workloads) {
+        const grid = document.getElementById('teamWorkloadGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        if (!workloads || workloads.length === 0) {
+            grid.innerHTML = '<p class="text-gray-500">No team members found under your management.</p>';
+            return;
+        }
+
+        const colors = ['bg-blue-500', 'bg-purple-500', 'bg-teal-500', 'bg-orange-500'];
+        workloads.forEach((member, index) => {
+            const color = colors[index % colors.length];
+            const memberWorkload = Number(member.workload) || 0;
+            const workloadStatus = memberWorkload > 5 ? 'Overloaded' : 'Balanced';
+            const maybeName = member.name || member.full_name || getUserNameById(member.user_id ?? member.id ?? member.userId);
+            const userLabel = maybeName ? `${maybeName}` : `User ${member.user_id ?? member.id ?? '—'}`;
+
+            grid.insertAdjacentHTML('beforeend', `
+                <div class="card ${color} text-white p-5 rounded-xl transition duration-150 transform hover:scale-[1.02] flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-4" viewBox="0 0 24 24" fill="white">
+                        <path fill-rule="evenodd" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" clip-rule="evenodd" />
+                    </svg>
+                    <div>
+                        <p class="text-sm font-medium opacity-90">${escapeHtml(String(userLabel))}</p>
+                        <p class="text-2xl font-bold mt-1">${Math.floor(memberWorkload)} Tasks</p>
+                        <p class="text-xs font-semibold mt-1">${workloadStatus}</p>
+                    </div>
+                </div>
+            `);
+        });
+    }
+
+    async function fetchTeamTasks() {
+        const data = await fetchData('/api/manager/tasks/');
+        if (!data) return;
+        if (data.error) {
+            console.warn('Tasks fetch error', data.error);
+            const tbody = document.getElementById('tasksBody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-600">Unable to load tasks: ${escapeHtml(String(data.error))}</td></tr>`;
+            return;
+        }
+        const tasks = data.tasks || data.data || data;
+        renderTeamTasks(Array.isArray(tasks) ? tasks : []);
+    }
+
+    window.teamList = [];
+    async function loadTeamForManager() {
+        const token = getAuthToken();
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/users/team`, { method: 'GET', headers: { 'Authorization': 'Bearer ' + token } });
+            if (!res.ok) return;
+            const arr = await res.json();
+            window.teamList = Array.isArray(arr) ? arr : [];
+
+            const managerId = getCurrentUserId();
+            const managerDetails = JSON.parse(localStorage.getItem('user') || 'null');
+
+            if (managerId && (!window.teamList.find(u => Number(u.id) === Number(managerId)))) {
+                const managerEntry = {
+                    id: managerId,
+                    name: managerDetails?.name || managerDetails?.full_name || `Current Manager`,
+                    email: managerDetails?.email || '',
+                    role: 'manager'
+                };
+                window.teamList.unshift(managerEntry);
+            }
+
+            const sel = document.getElementById('t_assignee');
+            if (sel) {
+                sel.innerHTML = '<option value="">— Unassigned —</option>';
+                window.teamList.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    const label = `${m.id} — ${m.name} (${m.email})`;
+                    opt.textContent = label + (Number(m.id) === Number(managerId) ? ' [You]' : '');
+                    sel.appendChild(opt);
+                });
+            }
+        } catch (e) { console.warn('loadTeamForManager error', e); }
+    }
+
+    function renderTeamTasks(tasks) {
+        const tbody = document.getElementById('tasksBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!tasks || tasks.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No tasks currently assigned to your team or yourself.</td></tr>';
+            return;
+        }
+
+        const currentManagerId = getCurrentUserId();
+
+        tasks.forEach(task => {
+            const statusKey = (task.status || '').toString().toLowerCase();
+            let statusColorClass = {
+                'pending': 'bg-gray-200 text-gray-800',
+                'assigned': 'bg-blue-200 text-blue-800',
+                'in_progress': 'bg-yellow-200 text-yellow-800',
+                'in progress': 'bg-yellow-200 text-yellow-800',
+                'completed': 'bg-green-200 text-green-800',
+                'blocked': 'bg-red-200 text-red-800'
+            }[statusKey] || 'bg-gray-200 text-gray-800';
+
+            let dueDateText = task.due_date ? new Date(task.due_date).toLocaleString() : 'N/A';
+
+            let assignHtml = '';
+            if (!task.assignee_id || statusKey === 'pending') {
+                assignHtml = `<button onclick="openAssignPromptForManager(${task.id})" class="text-xs bg-indigo-200 text-indigo-700 py-1 px-3 rounded hover:bg-indigo-300 transition">Assign</button>`;
+            }
+
+            let actions = '';
+            if (statusKey === 'completed') {
+                actions = `<button onclick="reassignTask(${task.id})" class="text-orange-600 hover:text-orange-800 mr-3 p-1 rounded transition duration-150" title="Reassign Task">Reassign</button>`;
+                actions += '<span class="text-green-700 font-semibold">Done</span>';
+            } else if (statusKey !== 'blocked') {
+                actions = `<button onclick="reassignTask(${task.id})" class="text-orange-600 hover:text-orange-800 mr-3 p-1 rounded transition duration-150" title="Reassign Task">Reassign</button>`;
+            } else {
+                actions = `<span class="text-red-700 font-semibold">Blocked</span>`;
+            }
+
+            const isManagerTask = Number(task.assignee_id) === currentManagerId;
+            const rowHighlightClass = isManagerTask ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'hover:bg-gray-50';
+
+            const assigneeNameFromList = getUserNameById(task.assignee_id);
+            const assigneeLabel = task.assignee_name || assigneeNameFromList || (task.assignee_id ? `User ${task.assignee_id}` : '—');
+            const finalAssigneeLabel = isManagerTask ? `${assigneeLabel} (You)` : assigneeLabel;
+
+            tbody.insertAdjacentHTML('beforeend', `
+                <tr class="${rowHighlightClass} transition duration-100">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(String(task.id ?? '—'))}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${escapeHtml(task.title ?? '—')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(String(finalAssigneeLabel))}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColorClass} capitalize">
+                            ${escapeHtml((task.status || '').replace('_', ' '))}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${escapeHtml(dueDateText)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        ${assignHtml}
+                        ${actions}
+                    </td>
+                </tr>
+            `);
+        });
+    }
+
+    async function openAssignPromptForManager(taskId) {
+        if (!window.teamList || window.teamList.length === 0) await loadTeamForManager();
+        if (!window.teamList || window.teamList.length === 0) { alert('No direct reports available'); return; }
+        const choices = window.teamList.map(u => `${u.id}: ${u.name}`).join('\n');
+        const picked = prompt(`Assign Task ${taskId}\n\nYour team (id:name):\n${choices}\n\nEnter the numeric ID to assign:`);
+        if (picked === null) return;
+        const id = parseInt(picked.trim(), 10);
+        if (isNaN(id)) { alert('Invalid id'); return; }
+        if (!confirm(`Assign task ${taskId} to user ${id}?`)) return;
+        const res = await fetchData('/api/tasks/assign', 'POST', { task_id: taskId, assignee_id: id });
+        if (!res || res.error) { alert((res && res.error) || 'Assignment failed'); return; }
+        alert('Task assigned');
+        fetchTeamTasks();
+        fetchTeamWorkload();
+    }
+
+    async function reassignTask(taskId) {
+        const newAssigneeId = prompt(`Enter the new User ID to reassign Task ${taskId} to:`);
+        if (newAssigneeId === null || newAssigneeId.trim() === "") {
+            return;
+        }
+
+        const assigneeId = parseInt(newAssigneeId.trim(), 10);
+
+        if (isNaN(assigneeId)) {
+            alert("Invalid User ID entered. Please enter a number.");
+            return;
+        }
+
+        if (!confirm(`Confirm reassigning Task ${taskId} to User ID ${assigneeId}?`)) {
+            return;
+        }
+
+        const data = await fetchData(`/api/tasks/reassign`, 'POST', { task_id: taskId, new_assignee_id: assigneeId });
+
+        if (data && !data.error) {
+            alert(`Task ${taskId} successfully reassigned to User ${assigneeId}.`);
+            await initDashboard();
+        } else if (data && data.error) {
+            alert(`Reassignment failed: ${data.error}`);
+        }
+    }
+
+    function getCurrentUserId() {
+        try {
+            const u = JSON.parse(localStorage.getItem('user') || 'null');
+            if (u && (u.id || u.user_id)) return Number(u.id || u.user_id);
+            const t = localStorage.getItem('token');
+            if (!t) return null;
+            const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            return Number(p.user_id || p.sub || null);
+        } catch (e) { return null; }
+    }
+
+    function showMessage(message, type = 'info') {
+        console.log(type.toUpperCase(), message);
+        const el = document.getElementById('managerMessage');
+        if (el) { el.textContent = message; el.className = type === 'error' ? 'text-red-600' : 'text-green-600'; }
+    }
+
+    function escapeHtml(unsafe) {
+        return (unsafe + '').replace(/[&<>"'`=\/]/g, function (s) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', "/": '&#x2F;', "`": '&#x60', "=": '&#x3D' }[s];
+        });
+    }
+
+    function showTaskModal() {
+        const modal = document.getElementById('taskModal');
+        if (!modal) { showMessage('Create Task modal not available on this page', 'error'); return; }
+        modal.classList.remove('hidden');
+        modal.classList.add('modal-active');
+        const form = document.getElementById('taskForm');
+        if (form) form.reset();
+        const tmsg = document.getElementById('t_message'); if (tmsg) tmsg.textContent = '';
+    }
+
+    function closeTaskModal() {
+        const modal = document.getElementById('taskModal');
+        if (!modal) return;
+        modal.classList.remove('modal-active');
+        modal.classList.add('hidden');
+    }
+
+    async function createTask(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        const titleEl = document.getElementById('t_title');
+        const dueEl = document.getElementById('t_due');
+        const msg = document.getElementById('t_message');
+
+        if (!titleEl || !dueEl) { if (msg) msg.textContent = 'Create Task UI not present.'; return; }
+
+        const title = titleEl.value.trim();
+        const description = document.getElementById('t_description') ? document.getElementById('t_description').value.trim() : '';
+        const priority = document.getElementById('t_priority') ? document.getElementById('t_priority').value : 'medium';
+        const due_date = dueEl.value;
+
+        const assigneeSel = document.getElementById('t_assignee');
+        if (!title || !due_date) { if (msg) msg.textContent = 'Title and due date required.'; return; }
+        if (msg) msg.textContent = 'Creating task...';
+
+        const payload = { title, description, priority, due_date };
+        if (assigneeSel && assigneeSel.value) payload.assignee_id = parseInt(assigneeSel.value, 10);
+
+        const res = await fetchData('/api/tasks', 'POST', payload);
+        if (!res) { if (msg) msg.textContent = 'Network error'; return; }
+        if (res.error) { if (msg) msg.textContent = 'Error: ' + res.error; return; }
+
+        if (msg) msg.textContent = 'Task created successfully.';
+        if (document.getElementById('taskForm')) document.getElementById('taskForm').reset();
+        setTimeout(() => {
+            closeTaskModal();
+            fetchTeamTasks();
+            fetchTeamWorkload();
+        }, 800);
+    }
+
+    function closeDependencyModal() {
+        const modal = document.getElementById('dependencyModal');
+        if (!modal) return;
+        modal.classList.remove('modal-active');
+        modal.classList.add('hidden');
+    }
+
+    async function createDependency(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        const prereEl = document.getElementById('dep_prereq');
+        const depEl = document.getElementById('dep_dependent');
+        const msg = document.getElementById('dep_message');
+        if (!prereEl || !depEl) { if (msg) msg.textContent = 'Dependency UI not present.'; return; }
+
+        const prereq = parseInt(prereEl.value, 10);
+        const dependent = parseInt(depEl.value, 10);
+
+        if (isNaN(prereq) || isNaN(dependent)) { if (msg) msg.textContent = 'Both task IDs must be valid numbers.'; return; }
+        if (msg) msg.textContent = 'Setting dependency...';
+
+        const res = await fetchData('/api/tasks/dependencies', 'POST', { prereq_id: prereq, dependent_id: dependent });
+        if (!res) { if (msg) msg.textContent = 'Network error'; return; }
+        if (res.error) { if (msg) msg.textContent = 'Error: ' + res.error; return; }
+
+        if (msg) msg.textContent = res.message || 'Dependency created successfully.';
+        setTimeout(() => { closeDependencyModal(); fetchTeamTasks(); }, 900);
+    }
+
+    async function populateDependencySelects() {
+        const prere = document.getElementById('dep_prereq');
+        const dep = document.getElementById('dep_dependent');
+        if (!prere || !dep) return;
+        prere.innerHTML = '<option value="">Loading...</option>';
+        dep.innerHTML = '<option value="">Loading...</option>';
+        try {
+            const res = await fetchData('/api/manager/tasks/');
+            let tasks = [];
+            if (!res) { prere.innerHTML = dep.innerHTML = '<option value="">No tasks</option>'; return; }
+            if (res.error) { prere.innerHTML = dep.innerHTML = `<option value="">Error: ${escapeHtml(String(res.error))}</option>`; return; }
+            if (Array.isArray(res)) tasks = res;
+            else if (Array.isArray(res.tasks)) tasks = res.tasks;
+            else if (Array.isArray(res.data)) tasks = res.data;
+            else {
+                const arr = Object.values(res).find(v => Array.isArray(v));
+                tasks = arr || [];
+            }
+
+            if (!Array.isArray(tasks) || tasks.length === 0) {
+                prere.innerHTML = dep.innerHTML = '<option value="">No tasks</option>';
+                return;
+            }
+
+            prere.innerHTML = '<option value="">Select prerequisite task...</option>';
+            dep.innerHTML = '<option value="">Select dependent task...</option>';
+
+            tasks.forEach(t => {
+                if (t.status && t.status.toString().toLowerCase() === 'completed') return;
+                const label = `${t.id} — ${t.title || t.name || 'Untitled'}`;
+                const option = `<option value="${t.id}">${escapeHtml(label)}</option>`;
+                prere.insertAdjacentHTML('beforeend', option);
+                dep.insertAdjacentHTML('beforeend', option);
+            });
+
+            prere.addEventListener('change', () => {
+                const p = prere.value;
+                Array.from(dep.options).forEach(o => { o.disabled = (o.value === p && p !== ''); });
+            });
+            dep.addEventListener('change', () => {
+                const d = dep.value;
+                Array.from(prere.options).forEach(o => { o.disabled = (o.value === d && d !== ''); });
+            });
+
+        } catch (err) {
+            prere.innerHTML = dep.innerHTML = '<option value="">Error loading</option>';
+            console.warn('populateDependencySelects error', err);
+        }
+    }
+
+    async function showDependencyModal() {
+        const modal = document.getElementById('dependencyModal');
+        if (!modal) { showMessage('Dependency modal not available on this page', 'error'); return; }
+        await populateDependencySelects();
+        modal.classList.remove('hidden');
+        modal.classList.add('modal-active');
+        const form = document.getElementById('dependencyForm');
+        if (form) form.reset();
+        const msg = document.getElementById('dep_message'); if (msg) msg.textContent = '';
+    }
+
+    async function batchSchedule() {
+        console.log('Batch Scheduler initiated. Proceeding with auto-assignment...');
+        const btn = document.getElementById('batchScheduleBtn');
+        if (btn) btn.disabled = true;
+        const scheduleEl = document.getElementById('scheduleMessage');
+        if (scheduleEl) scheduleEl.textContent = 'Running scheduler...';
+        const res = await fetchData('/api/tasks/batch-schedule', 'POST');
+        if (btn) btn.disabled = false;
+        if (!res) { if (scheduleEl) scheduleEl.textContent = 'Network error'; return; }
+        if (res.error) { if (scheduleEl) scheduleEl.textContent = 'Error: ' + res.error; return; }
+        if (scheduleEl) scheduleEl.textContent = res.message || 'Batch scheduling complete.';
+        fetchTeamTasks();
+        fetchTeamWorkload();
+    }
+
+    async function fetchNotifications() {
+        const res = await fetchData('/api/notifications', 'GET');
+        if (!res || res.error) {
+            return { error: (res && res.error) || 'Unable to fetch notifications' };
+        }
+        let items = [];
+        if (Array.isArray(res)) items = res;
+        else if (res.notifications && Array.isArray(res.notifications)) items = res.notifications;
+        else if (res.data && Array.isArray(res.data)) items = res.data;
+        else {
+            const arr = Object.values(res || {}).find(v => Array.isArray(v));
+            items = arr || [];
+        }
+        return { ok: true, items };
+    }
+
+    async function openNotifModal() {
+        const modal = document.getElementById('notifModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('modal-active');
+        const list = document.getElementById('notifList');
+        list.innerHTML = '<p class="text-sm text-gray-500">Loading...</p>';
+
+        const r = await fetchNotifications();
+        if (!r.ok) {
+            list.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(r.error)}</p>`;
+            return;
+        }
+        const items = r.items;
+        if (!items || items.length === 0) {
+            list.innerHTML = '<p class="text-sm text-gray-500">No notifications</p>';
+            return;
+        }
+        list.innerHTML = '';
+        items.forEach(n => {
+            const when = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+            const isRead = !!n.read;
+            const html = `<div class="p-3 border rounded ${isRead ? '' : 'bg-indigo-50'}">
+                <div class="text-sm">${escapeHtml(n.message || n.msg || n.body || '')}</div>
+                <div class="text-xs text-gray-500 mt-1">${escapeHtml(when)}</div>
+            </div>`;
+            list.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    function closeNotifModal() {
+        const modal = document.getElementById('notifModal');
+        if (!modal) return;
+        modal.classList.remove('modal-active');
+        modal.classList.add('hidden');
+    }
+
+    async function markAllRead() {
+        const res = await fetchData('/api/notifications/mark-all-read', 'POST', {});
+        if (!res || res.error) {
+            showMessage((res && res.error) || 'Failed to mark notifications read', 'error');
+            return;
+        }
+        await openNotifModal();
+        showMessage('Notifications marked read', 'success');
+    }
+
+    // Event Listeners and Init
+    document.getElementById('showCreateTaskBtn').addEventListener('click', showTaskModal);
+    document.getElementById('taskForm').addEventListener('submit', createTask);
+    document.getElementById('showDependencyBtn').addEventListener('click', showDependencyModal);
+    document.getElementById('dependencyForm').addEventListener('submit', createDependency);
+    document.getElementById('batchScheduleBtn').addEventListener('click', batchSchedule);
+    document.getElementById('showNotificationsBtn').addEventListener('click', openNotifModal);
+
+    async function initDashboard() {
+        if (!requireManagerOrRedirect()) {
+            return;
+        }
+        await loadTeamForManager();
+        await fetchTeamWorkload();
+        await fetchTeamTasks();
+    }
+
+    window.addEventListener('load', initDashboard);
+</script>
+</body>
+</html>

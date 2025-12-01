@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Create User</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f4f7f9; }
+        .card { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="card bg-white p-8 rounded-xl max-w-lg w-full border-t-4 border-purple-600">
+        <header class="mb-6 border-b pb-4">
+            <h1 class="text-3xl font-bold text-gray-800">Admin Panel</h1>
+            <p class="text-gray-500">Create New User Account</p>
+        </header>
+
+        <main class="space-y-6">
+            <h3 class="text-xl font-semibold text-gray-700">User Details</h3>
+
+            <form id="createUserForm" class="space-y-4" novalidate>
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input type="text" id="name" required placeholder="John Doe"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                </div>
+
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                    <input type="email" id="email" required placeholder="john.doe@company.com"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                </div>
+
+                <div>
+                    <label for="position" class="block text-sm font-medium text-gray-700">Position</label>
+                    <input type="text" id="position" placeholder="Software Engineer / HR Specialist"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                </div>
+
+                <div>
+                    <label for="role" class="block text-sm font-medium text-gray-700">User Role</label>
+                    <select id="role"
+                            class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                        <option value="employee" selected>Employee</option>
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+
+                <!-- Supervisor dropdown (optional) -->
+                <div>
+                    <label for="supervisor" class="block text-sm font-medium text-gray-700">Supervisor (optional)</label>
+                    <select id="supervisor"
+                            class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                        <option value="">— No Supervisor —</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Choose a manager to assign this user under. Leave blank for none.</p>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Temporary Password</label>
+                    <input type="password" id="password" required placeholder="Must be 6+ characters"
+                           class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-purple-500 focus:border-purple-500 transition duration-150">
+                </div>
+
+                <button type="submit" id="submitBtn"
+                        class="w-full bg-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-purple-700 transition duration-150 shadow-md">
+                    Create User Account
+                </button>
+            </form>
+
+            <p id="result" class="text-center font-medium pt-2"></p>
+
+            <div class="pt-4 border-t mt-4 flex items-center justify-between">
+                <button id="backBtn" class="text-gray-700 hover:text-gray-900 font-medium transition duration-150">
+                    &larr; Back
+                </button>
+                <a class="text-purple-600 hover:text-purple-500 font-medium transition duration-150" href="/static/admin.html">
+                    Open Admin Dashboard
+                </a>
+            </div>
+        </main>
+    </div>
+
+<script>
+const API_BASE_URL = window.location.origin;
+
+function getToken() { return localStorage.getItem('token'); }
+function logoutToLogin() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }
+
+async function loadManagersIntoSelect() {
+    const token = getToken();
+    const sel = document.getElementById('supervisor');
+    if (!sel) return;
+    sel.innerHTML = '<option value=\"\">— No Supervisor —</option>';
+    if (!token) return; // silently leave option empty; admin without token will be redirected on submit
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/users?role=manager`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            // if unauthorized, do nothing here; create will handle token check
+            return;
+        }
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+        data.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = `${m.id} — ${m.name} (${m.email})`;
+            sel.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to load managers', e);
+    }
+}
+
+async function handleCreateUser(event) {
+    event.preventDefault();
+    const token = getToken();
+    const resultDiv = document.getElementById('result');
+    const button = document.getElementById('submitBtn');
+
+    if (!token) {
+        resultDiv.className = 'text-red-500';
+        resultDiv.textContent = 'Authentication required. Redirecting to login...';
+        setTimeout(logoutToLogin, 1200);
+        return;
+    }
+
+    const payload = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        position: document.getElementById('position').value.trim(),
+        role: document.getElementById('role').value,
+        password: document.getElementById('password').value
+    };
+
+    const sup = document.getElementById('supervisor').value;
+    if (sup && sup !== '') payload.supervisor_id = parseInt(sup, 10);
+
+    resultDiv.className = 'text-gray-500';
+    resultDiv.textContent = 'Creating user...';
+    button.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json().catch(()=>({}));
+
+        if (response.ok) {
+            resultDiv.className = 'text-green-600';
+            resultDiv.textContent = `Success — user ${data.user.email} (ID ${data.user.id}) created.`;
+            document.getElementById('createUserForm').reset();
+            // reload managers (in case new manager was created)
+            await loadManagersIntoSelect();
+        } else if (response.status === 401 || response.status === 403) {
+            resultDiv.className = 'text-red-600';
+            resultDiv.textContent = data.msg || data.message || 'Unauthorized — please login.';
+            setTimeout(logoutToLogin, 900);
+        } else {
+            resultDiv.className = 'text-red-600';
+            resultDiv.textContent = data.msg || data.message || 'Failed to create user.';
+        }
+    } catch (error) {
+        resultDiv.className = 'text-red-600';
+        resultDiv.textContent = 'Network error. Could not connect to API.';
+        console.error('Create user error:', error);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('createUserForm').addEventListener('submit', handleCreateUser);
+    document.getElementById('backBtn').addEventListener('click', () => {
+        if (history.length > 1) history.back(); else window.location.href = '/static/admin.html';
+    });
+    loadManagersIntoSelect();
+});
+</script>
+</body>
+</html>
